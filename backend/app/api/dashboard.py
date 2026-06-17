@@ -9,6 +9,8 @@ from app.database.session import get_db
 from app.models.models import Endpoint, User
 from app.schemas.schemas import DashboardSummary, EndpointResponse, PaginatedResponse
 from app.services.dashboard import DashboardService
+from app.services.endpoint_service import EndpointService
+from app.api.deps import clean_filter
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 dashboard_service = DashboardService()
@@ -82,31 +84,59 @@ async def get_incident_distribution(
 
 
 endpoints_router = APIRouter(prefix="/endpoints", tags=["Endpoints"])
+endpoint_service = EndpointService()
+
+
+@endpoints_router.get("/filters")
+async def get_endpoint_filters(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await endpoint_service.get_filter_options(db)
+
+
+@endpoints_router.get("/stats")
+async def get_endpoint_stats(
+    hostname: Optional[str] = Query(None, max_length=255),
+    site: Optional[str] = Query(None, max_length=255),
+    group: Optional[str] = Query(None, max_length=255),
+    os_name: Optional[str] = Query(None, max_length=100),
+    ip_address: Optional[str] = Query(None, max_length=45),
+    online_only: Optional[bool] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await endpoint_service.get_stats(
+        db,
+        clean_filter(hostname),
+        clean_filter(site),
+        clean_filter(group),
+        clean_filter(os_name),
+        clean_filter(ip_address),
+        online_only,
+    )
 
 
 @endpoints_router.get("", response_model=PaginatedResponse)
 async def list_endpoints(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    online_only: Optional[bool] = None,
+    hostname: Optional[str] = Query(None, max_length=255),
+    site: Optional[str] = Query(None, max_length=255),
+    group: Optional[str] = Query(None, max_length=255),
+    os_name: Optional[str] = Query(None, max_length=100),
+    ip_address: Optional[str] = Query(None, max_length=45),
+    online_only: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    from sqlalchemy import func
-
-    query = select(Endpoint)
-    count_query = select(func.count(Endpoint.id))
-    if online_only is not None:
-        query = query.where(Endpoint.is_online == online_only)
-        count_query = count_query.where(Endpoint.is_online == online_only)
-
-    total = await db.scalar(count_query) or 0
-    result = await db.execute(
-        query.order_by(Endpoint.hostname).offset((page - 1) * page_size).limit(page_size)
+    items, total = await endpoint_service.list_endpoints(
+        db, page, page_size,
+        clean_filter(hostname), clean_filter(site), clean_filter(group),
+        clean_filter(os_name), clean_filter(ip_address), online_only,
     )
-    items = [EndpointResponse.model_validate(e) for e in result.scalars().all()]
     return PaginatedResponse(
-        items=items,
+        items=[EndpointResponse.model_validate(e) for e in items],
         total=total,
         page=page,
         page_size=page_size,

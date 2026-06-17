@@ -1,15 +1,28 @@
-import { Box, Grid, Typography, Card, CardContent, List, ListItem, ListItemText } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { Box, Typography } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatDistanceToNow } from 'date-fns';
-import { Security, Warning, Computer } from '@mui/icons-material';
-import { SeverityKPICard } from '../components/KPICard';
-import { AlertsTimelineChart, MitreHeatmap } from '../components/Charts';
-import { SeverityChip } from '../components/SeverityChip';
-import { dashboardApi } from '../services/endpoints';
+import { dashboardApi, threatsApi, alertsApi } from '../services/endpoints';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { WallboardCenter } from '../components/wallboard/WallboardCenter';
+import { WallboardThreatFeed } from '../components/wallboard/WallboardThreatFeed';
+import { WallboardAttackTypes } from '../components/wallboard/WallboardAttackTypes';
+import { WallboardMitreTactics } from '../components/wallboard/WallboardMitreTactics';
+import {
+  WallboardSystemOverview,
+  WallboardTopAssets,
+  WallboardSeverityDonut,
+  WallboardActiveAlerts,
+} from '../components/wallboard/WallboardRightColumn';
+import { WallboardFooter } from '../components/wallboard/WallboardFooter';
 
 export function WallboardPage() {
   const queryClient = useQueryClient();
+  const [clock, setClock] = useState(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useWebSocket('dashboard', () => {
     queryClient.invalidateQueries({ queryKey: ['wallboard'] });
@@ -23,13 +36,7 @@ export function WallboardPage() {
 
   const { data: threats } = useQuery({
     queryKey: ['wallboard', 'threats'],
-    queryFn: () => dashboardApi.threats(15).then((r) => r.data),
-    refetchInterval: 15000,
-  });
-
-  const { data: timeline } = useQuery({
-    queryKey: ['wallboard', 'timeline'],
-    queryFn: () => dashboardApi.timeline(12).then((r) => r.data),
+    queryFn: () => dashboardApi.threats(12).then((r) => r.data),
     refetchInterval: 15000,
   });
 
@@ -41,115 +48,183 @@ export function WallboardPage() {
 
   const { data: topAssets } = useQuery({
     queryKey: ['wallboard', 'top-assets'],
-    queryFn: () => dashboardApi.topAssets(8).then((r) => r.data),
+    queryFn: () => dashboardApi.topAssets(6).then((r) => r.data),
     refetchInterval: 15000,
   });
 
+  const { data: timeline } = useQuery({
+    queryKey: ['wallboard', 'timeline'],
+    queryFn: () => dashboardApi.timeline(12).then((r) => r.data),
+    refetchInterval: 15000,
+  });
+
+  const { data: threatTypes } = useQuery({
+    queryKey: ['wallboard', 'threat-types'],
+    queryFn: () => threatsApi.list().then((r) => r.data.severity_distribution as Record<string, number>),
+    refetchInterval: 30000,
+  });
+
+  const { data: contained } = useQuery({
+    queryKey: ['wallboard', 'contained'],
+    queryFn: () =>
+      alertsApi.list({ status: 'CONTAINED', page_size: 1 }).then((r) => r.data.total),
+    refetchInterval: 30000,
+  });
+
+  const sparkData = (timeline || []).map(
+    (p) => p.critical + p.high + p.medium + p.low
+  );
+
+  const recentAlerts = (timeline || []).slice(-1).reduce(
+    (sum, p) => sum + p.critical + p.high + p.medium + p.low,
+    summary?.new_alerts ?? 0
+  );
+
   return (
-    <Box sx={{
-      minHeight: '100vh', bgcolor: '#0a0e17', p: 3,
-      background: 'radial-gradient(ellipse at top, #111827 0%, #0a0e17 70%)',
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Security sx={{ fontSize: 40, color: '#00bcd4', mr: 2 }} />
-        <Box>
-          <Typography variant="h3" fontWeight={800} sx={{ color: '#fff', letterSpacing: 2 }}>
-            SOC WALLBOARD
-          </Typography>
-          <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-            Security Operations Center · Live Monitoring
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: '#020617',
+        background: `
+          radial-gradient(ellipse at 50% 0%, rgba(30,58,138,0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at 0% 100%, rgba(239,68,68,0.05) 0%, transparent 40%),
+          radial-gradient(ellipse at 100% 100%, rgba(59,130,246,0.08) 0%, transparent 40%),
+          #020617
+        `,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Top status bar */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          px: 2,
+          py: 0.75,
+          borderBottom: '1px solid rgba(59,130,246,0.15)',
+          background: 'rgba(2,6,23,0.8)',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              bgcolor: '#22c55e',
+              boxShadow: '0 0 8px #22c55e',
+              animation: 'blink 2s ease-in-out infinite',
+              '@keyframes blink': {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.4 },
+              },
+            }}
+          />
+          <Typography sx={{ fontSize: '0.65rem', letterSpacing: '0.15em', color: '#22c55e' }}>
+            LIVE
           </Typography>
         </Box>
-        <Box sx={{ ml: 'auto', textAlign: 'right' }}>
-          <Typography variant="h5" sx={{ color: '#00bcd4', fontFamily: 'monospace' }}>
-            {new Date().toLocaleTimeString()}
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
-            Auto-refresh: 15s
-          </Typography>
+        <Typography
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '1.1rem',
+            fontWeight: 700,
+            color: '#3b82f6',
+            letterSpacing: '0.05em',
+          }}
+        >
+          {clock.toLocaleTimeString()}
+        </Typography>
+        <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em' }}>
+          REFRESH 15s · SENTINELONE
+        </Typography>
+      </Box>
+
+      {/* Main 3-column grid */}
+      <Box
+        sx={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '1fr 1.2fr 1fr' },
+          gap: 1.5,
+          p: 1.5,
+          minHeight: 0,
+        }}
+      >
+        {/* Left column */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, minHeight: 0 }}>
+          <Box sx={{ flex: '1 1 40%', minHeight: 180 }}>
+            <WallboardThreatFeed threats={threats || []} />
+          </Box>
+          <WallboardAttackTypes distribution={threatTypes || {}} />
+          <WallboardMitreTactics heatmap={heatmap || []} />
+        </Box>
+
+        {/* Center column */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+            minHeight: 400,
+          }}
+        >
+          <Box
+            sx={{
+              flex: 1,
+              border: '1px solid rgba(59,130,246,0.2)',
+              borderRadius: '4px',
+              background: `
+                linear-gradient(rgba(59,130,246,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.02) 1px, transparent 1px),
+                radial-gradient(ellipse at center, rgba(30,58,138,0.2) 0%, transparent 70%)
+              `,
+              backgroundSize: '30px 30px, 30px 30px, 100% 100%',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Corner brackets */}
+            {(['tl', 'tr', 'bl', 'br'] as const).map((corner) => (
+              <Box
+                key={corner}
+                sx={{
+                  position: 'absolute',
+                  width: 20,
+                  height: 20,
+                  borderColor: 'rgba(59,130,246,0.5)',
+                  borderStyle: 'solid',
+                  borderWidth: 0,
+                  ...(corner === 'tl' && { top: 8, left: 8, borderTopWidth: 2, borderLeftWidth: 2 }),
+                  ...(corner === 'tr' && { top: 8, right: 8, borderTopWidth: 2, borderRightWidth: 2 }),
+                  ...(corner === 'bl' && { bottom: 8, left: 8, borderBottomWidth: 2, borderLeftWidth: 2 }),
+                  ...(corner === 'br' && { bottom: 8, right: 8, borderBottomWidth: 2, borderRightWidth: 2 }),
+                }}
+              />
+            ))}
+            <WallboardCenter />
+          </Box>
+        </Box>
+
+        {/* Right column */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <WallboardSystemOverview
+            summary={summary}
+            timelineSpark={sparkData}
+            containedCount={contained ?? 0}
+          />
+          <WallboardTopAssets assets={topAssets || []} />
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            <WallboardSeverityDonut summary={summary} />
+            <WallboardActiveAlerts count={recentAlerts} />
+          </Box>
         </Box>
       </Box>
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={6} md={2.4}>
-          <SeverityKPICard title="Critical Alerts" value={summary?.critical ?? 0}
-            severity="CRITICAL" large />
-        </Grid>
-        <Grid item xs={6} md={2.4}>
-          <SeverityKPICard title="High Alerts" value={summary?.high ?? 0}
-            severity="HIGH" large />
-        </Grid>
-        <Grid item xs={6} md={2.4}>
-          <SeverityKPICard title="Open Incidents" value={summary?.open_incidents ?? 0}
-            severity="HIGH" large />
-        </Grid>
-        <Grid item xs={6} md={2.4}>
-          <SeverityKPICard title="Endpoints Online" value={summary?.online_agents ?? 0}
-            severity="LOW" large />
-        </Grid>
-        <Grid item xs={6} md={2.4}>
-          <SeverityKPICard title="Endpoints Offline" value={summary?.offline_agents ?? 0}
-            severity="CRITICAL" large />
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={5}>
-          <Card sx={{ bgcolor: '#111827', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Warning sx={{ color: '#ef4444', mr: 1 }} />
-                <Typography variant="h5" fontWeight={700}>Live Threat Feed</Typography>
-              </Box>
-              <List>
-                {(threats || []).map((t) => (
-                  <ListItem key={t.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1.5 }}>
-                    <ListItemText
-                      primary={<Typography variant="body1" fontWeight={500}>{t.title}</Typography>}
-                      secondary={
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                          {t.hostname || 'Unknown'} · {formatDistanceToNow(new Date(t.created_at), { addSuffix: true })}
-                        </Typography>
-                      }
-                    />
-                    <SeverityChip severity={t.severity} size="medium" />
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={7}>
-          <AlertsTimelineChart data={timeline || []} title="Threat Timeline (12h)" />
-        </Grid>
-        <Grid item xs={12} md={8}>
-          <MitreHeatmap data={heatmap || []} />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ bgcolor: '#111827', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Computer sx={{ color: '#00bcd4', mr: 1 }} />
-                <Typography variant="h5" fontWeight={700}>Top Affected Assets</Typography>
-              </Box>
-              <List>
-                {(topAssets || []).map((asset, i) => (
-                  <ListItem key={asset.hostname} sx={{ py: 1 }}>
-                    <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.3)', mr: 2, minWidth: 24 }}>
-                      {i + 1}
-                    </Typography>
-                    <ListItemText
-                      primary={asset.hostname}
-                      secondary={`${asset.alert_count} alerts`}
-                    />
-                    <SeverityChip severity={asset.severity_max} />
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <WallboardFooter />
     </Box>
   );
 }

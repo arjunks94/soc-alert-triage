@@ -13,7 +13,7 @@ from app.core.security import (
 )
 from app.database.session import get_db
 from app.models.models import User
-from app.schemas.schemas import LoginRequest, Token, UserCreate, UserResponse
+from app.schemas.schemas import LoginRequest, RefreshRequest, Token, UserCreate, UserResponse
 from app.utils.helpers import create_audit_log
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -37,9 +37,9 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = payload.get("sub")

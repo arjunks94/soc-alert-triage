@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import Alert, Incident
 from app.schemas.schemas import AlertUpdate
 from app.utils.helpers import create_audit_log, generate_incident_number, normalize_severity
+from app.utils.sanitize import sanitize_search, sanitize_text
 
 
 class AlertService:
@@ -29,6 +30,7 @@ class AlertService:
         count_query = select(func.count(Alert.id))
 
         filters = []
+        search = sanitize_search(search)
         if search:
             pattern = f"%{search}%"
             filters.append(
@@ -80,8 +82,8 @@ class AlertService:
             changes["assigned_analyst_id"] = str(update.assigned_analyst_id)
             alert.assigned_analyst_id = update.assigned_analyst_id
         if update.notes is not None:
-            changes["notes"] = update.notes
-            alert.notes = update.notes
+            changes["notes"] = sanitize_text(update.notes)
+            alert.notes = changes["notes"]
         if update.severity:
             changes["severity"] = normalize_severity(update.severity)
             alert.severity = normalize_severity(update.severity)

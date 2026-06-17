@@ -14,11 +14,33 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const { refreshToken, setTokens, logout } = useAuthStore.getState();
+  if (!refreshToken) return null;
+  try {
+    const { data } = await axios.post('/api/auth/refresh', { refresh_token: refreshToken });
+    setTokens(data.access_token, data.refresh_token);
+    return data.access_token;
+  } catch {
+    logout();
+    return null;
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
+    const original = error.config;
+    if (error.response?.status === 401 && original && !original._retry) {
+      original._retry = true;
+      refreshPromise ??= refreshAccessToken().finally(() => { refreshPromise = null; });
+      const newToken = await refreshPromise;
+      if (newToken) {
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      }
       window.location.href = '/login';
     }
     return Promise.reject(error);

@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import clean_filter
 from app.core.security import get_current_user, require_role
 from app.database.session import get_db
 from app.models.models import User
@@ -31,7 +32,7 @@ async def list_incidents(
     _: User = Depends(get_current_user),
 ):
     incidents, total = await incident_service.list_incidents(
-        db, page, page_size, status_filter, severity
+        db, page, page_size, clean_filter(status_filter), clean_filter(severity)
     )
     return PaginatedResponse(
         items=[IncidentResponse.model_validate(i) for i in incidents],

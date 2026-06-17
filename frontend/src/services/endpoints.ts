@@ -52,9 +52,27 @@ export const incidentsApi = {
     api.post(`/incidents/${id}/evidence`, evidence),
 };
 
+export interface EndpointFilterOptions {
+  sites: { name: string; count: number }[];
+  groups: { name: string; count: number }[];
+  os_names: { name: string; count: number }[];
+  total: number;
+  online: number;
+  offline: number;
+}
+
+export interface EndpointStats {
+  total: number;
+  online: number;
+  offline: number;
+}
+
 export const endpointsApi = {
   list: (params: Record<string, string | number | boolean>) =>
     api.get<PaginatedResponse<Endpoint>>('/endpoints', { params }),
+  filters: () => api.get<EndpointFilterOptions>('/endpoints/filters'),
+  stats: (params: Record<string, string | boolean>) =>
+    api.get<EndpointStats>('/endpoints/stats', { params }),
 };
 
 export const usersApi = {

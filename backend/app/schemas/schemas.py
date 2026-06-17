@@ -18,17 +18,21 @@ class TokenPayload(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=128)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=10, max_length=2048)
 
 
 class UserBase(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     email: EmailStr
-    role: str = "SOC_ANALYST"
+    role: str = Field(default="SOC_ANALYST", pattern="^(SOC_ADMIN|SOC_MANAGER|SOC_ANALYST|VIEWER)$")
 
 
 class UserCreate(UserBase):
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class UserUpdate(BaseModel):
@@ -64,10 +68,10 @@ class AlertCreate(AlertBase):
 
 
 class AlertUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(NEW|OPEN|INVESTIGATING|ESCALATED|CONTAINED|FALSE_POSITIVE|CLOSED)$")
     assigned_analyst_id: Optional[UUID] = None
-    notes: Optional[str] = None
-    severity: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
+    severity: Optional[str] = Field(None, pattern="^(CRITICAL|HIGH|MEDIUM|LOW)$")
 
 
 class AlertResponse(AlertBase):

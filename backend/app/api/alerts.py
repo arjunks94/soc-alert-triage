@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import clean_search
 from app.core.security import get_current_user, require_role
 from app.database.session import get_db
 from app.models.models import User
@@ -25,7 +26,7 @@ alert_service = AlertService()
 async def list_alerts(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    search: Optional[str] = None,
+    search: Optional[str] = Query(None, max_length=200),
     severity: Optional[str] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
     analyst_id: Optional[UUID] = None,
@@ -33,7 +34,7 @@ async def list_alerts(
     _: User = Depends(get_current_user),
 ):
     alerts, total = await alert_service.list_alerts(
-        db, page, page_size, search, severity, status_filter, analyst_id
+        db, page, page_size, clean_search(search), severity, status_filter, analyst_id
     )
     return PaginatedResponse(
         items=[AlertResponse.model_validate(a) for a in alerts],

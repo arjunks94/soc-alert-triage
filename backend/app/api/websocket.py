@@ -1,9 +1,15 @@
 import json
-from typing import Set
+from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from jose import JWTError
 
 from app.core.logging import get_logger
+from app.core.security import decode_token
+from app.database.session import AsyncSessionLocal
+from app.models.models import User
+from sqlalchemy import select
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -11,7 +17,7 @@ router = APIRouter()
 
 class ConnectionManager:
     def __init__(self) -> None:
-        self.active_connections: dict[str, Set[WebSocket]] = {
+        self.active_connections: dict[str, set[WebSocket]] = {
             "alerts": set(),
             "incidents": set(),
             "dashboard": set(),
@@ -41,31 +47,49 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/alerts")
-async def websocket_alerts(websocket: WebSocket):
-    await manager.connect("alerts", websocket)
+async def _authenticate_ws(token: Optional[str]) -> bool:
+    if not token:
+        return False
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "access":
+            return False
+        user_id = payload.get("sub")
+        if not user_id:
+            return False
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(User).where(User.id == UUID(user_id), User.is_active.is_(True))
+            )
+            return result.scalar_one_or_none() is not None
+    except (JWTError, ValueError):
+        return False
+
+
+async def _ws_handler(websocket: WebSocket, channel: str) -> None:
+    token = websocket.query_params.get("token")
+    if not await _authenticate_ws(token):
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    await manager.connect(channel, websocket)
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect("alerts", websocket)
+        manager.disconnect(channel, websocket)
+
+
+@router.websocket("/ws/alerts")
+async def websocket_alerts(websocket: WebSocket, token: Optional[str] = Query(None)):
+    await _ws_handler(websocket, "alerts")
 
 
 @router.websocket("/ws/incidents")
-async def websocket_incidents(websocket: WebSocket):
-    await manager.connect("incidents", websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect("incidents", websocket)
+async def websocket_incidents(websocket: WebSocket, token: Optional[str] = Query(None)):
+    await _ws_handler(websocket, "incidents")
 
 
 @router.websocket("/ws/dashboard")
-async def websocket_dashboard(websocket: WebSocket):
-    await manager.connect("dashboard", websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect("dashboard", websocket)
+async def websocket_dashboard(websocket: WebSocket, token: Optional[str] = Query(None)):
+    await _ws_handler(websocket, "dashboard")

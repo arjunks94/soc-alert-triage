@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
-  Box, Card, CardContent, TextField, Button, Typography, Alert, CircularProgress,
+  Box, TextField, Button, Typography, Alert, CircularProgress,
 } from '@mui/material';
 import { Security } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/endpoints';
 import { useAuthStore } from '../stores/authStore';
+import { GlassPanel, fieldSx } from '../components/ui/GlassPanel';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,37 +40,63 @@ export function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0a0e17 0%, #1a1f2e 50%, #0a0e17 100%)',
+        background: 'linear-gradient(135deg, #020617 0%, #0f172a 40%, #020617 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          width: 600,
+          height: 600,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+          top: -200,
+          right: -100,
+        },
       }}
     >
-      <Card sx={{ width: 420, maxWidth: '90vw' }}>
-        <CardContent sx={{ p: 4 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Security sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-            <Typography variant="h5" fontWeight={700}>SOC Dashboard</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Security Operations Center
-            </Typography>
-          </Box>
+      <Box sx={{ width: 420, maxWidth: '90vw', position: 'relative', zIndex: 1 }}>
+        <Box sx={{ textAlign: 'center', mb: 3 }}>
+          <Security sx={{ fontSize: 52, color: '#3b82f6', mb: 1, filter: 'drop-shadow(0 0 12px rgba(59,130,246,0.5))' }} />
+          <Typography
+            variant="h4"
+            fontWeight={800}
+            sx={{
+              background: 'linear-gradient(90deg, #f1f5f9, #3b82f6)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
+            SOC Dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Security Operations Center
+          </Typography>
+        </Box>
+
+        <GlassPanel accent="#3b82f6">
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth label="Email" type="email" value={email}
               onChange={(e) => setEmail(e.target.value)} margin="normal" required
+              sx={fieldSx}
             />
             <TextField
               fullWidth label="Password" type="password" value={password}
               onChange={(e) => setPassword(e.target.value)} margin="normal" required
+              sx={fieldSx}
             />
             <Button
               fullWidth type="submit" variant="contained" size="large"
-              disabled={loading} sx={{ mt: 2, py: 1.5 }}
+              disabled={loading}
+              sx={{ mt: 2, py: 1.5, fontWeight: 700, boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
             >
               {loading ? <CircularProgress size={24} /> : 'Sign In'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </GlassPanel>
+      </Box>
     </Box>
   );
 }
