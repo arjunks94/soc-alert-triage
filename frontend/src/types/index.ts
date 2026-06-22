@@ -61,6 +61,25 @@ export interface Endpoint {
   is_online: boolean;
   group_name?: string;
   site_name?: string;
+  raw_data?: Record<string, unknown>;
+}
+
+export interface SecurityEvent {
+  id: string;
+  sentinel_event_id: string;
+  event_type: string;
+  category: string;
+  title: string;
+  description?: string;
+  hostname?: string;
+  agent_id?: string;
+  user_name?: string;
+  site_name?: string;
+  severity: string;
+  event_at: string;
+  raw_data?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface DashboardSummary {

@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import {
   Dashboard, Warning, Report, Computer, Security, People, Settings,
-  Tv, Menu as MenuIcon, Logout,
+  Tv, Menu as MenuIcon, Logout, Event,
 } from '@mui/icons-material';
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -18,6 +18,7 @@ const navItems = [
   { label: 'Alerts', path: '/alerts', icon: <Warning /> },
   { label: 'Incidents', path: '/incidents', icon: <Report /> },
   { label: 'Endpoints', path: '/endpoints', icon: <Computer /> },
+  { label: 'Events', path: '/events', icon: <Event /> },
   { label: 'Threats', path: '/threats', icon: <Security /> },
   { label: 'Analysts', path: '/analysts', icon: <People /> },
   { label: 'Wallboard', path: '/wallboard', icon: <Tv /> },

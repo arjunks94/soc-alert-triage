@@ -54,6 +54,29 @@ class Endpoint(Base):
     is_online: Mapped[bool] = mapped_column(default=False, index=True)
     group_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     site_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class SecurityEvent(Base):
+    __tablename__ = "security_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sentinel_event_id: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    category: Mapped[str] = mapped_column(String(50), index=True, default="activity", nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    agent_id: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)
+    user_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    site_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    severity: Mapped[str] = mapped_column(String(50), default="INFO", index=True)
+    event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

@@ -1,5 +1,6 @@
 import { Chip } from '@mui/material';
-import { severityColors, statusColors } from '../theme';
+import { getClassificationColor, formatClassificationLabel } from '../utils/classificationColors';
+import { statusColors } from '../theme';
 
 interface SeverityChipProps {
   severity: string;
@@ -7,10 +8,10 @@ interface SeverityChipProps {
 }
 
 export function SeverityChip({ severity, size = 'small' }: SeverityChipProps) {
-  const color = severityColors[severity] || '#6b7280';
+  const color = getClassificationColor(severity);
   return (
     <Chip
-      label={severity}
+      label={formatClassificationLabel(severity)}
       size={size}
       sx={{
         backgroundColor: `${color}22`,

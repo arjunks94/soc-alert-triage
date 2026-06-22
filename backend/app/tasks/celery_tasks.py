@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from celery import Celery
@@ -46,6 +47,10 @@ celery_app.conf.update(
             "task": "app.tasks.celery_tasks.sync_threats",
             "schedule": 300.0,
         },
+        "sync-events": {
+            "task": "app.tasks.celery_tasks.sync_events",
+            "schedule": 300.0,
+        },
     },
 )
 
@@ -63,6 +68,8 @@ def _broadcast_sync(task_name: str, count: int) -> None:
             "sync_threats": "alerts",
             "sync_incidents": "incidents",
             "sync_agents": "dashboard",
+            "sync_events": "events",
+            "sync_all": "dashboard",
         }
         channel = channel_map.get(task_name, "dashboard")
         asyncio.run(manager.broadcast(channel, {"type": "sync_complete", "task": task_name, "count": count}))
@@ -72,13 +79,13 @@ def _broadcast_sync(task_name: str, count: int) -> None:
         logger.warning("ws_broadcast_failed", error=str(exc))
 
 
-def _run_sync(task_name: str, sync_method: str) -> dict:
+def _run_sync(task_name: str, sync_method: str, **kwargs) -> dict:
     start = time.monotonic()
     session = SyncSession()
     try:
         service = SyncService()
         method = getattr(service, sync_method)
-        count = method(session)
+        count = method(session, **kwargs)
         session.commit()
         duration = time.monotonic() - start
         SYNC_DURATION.labels(task_name=task_name).observe(duration)
@@ -89,6 +96,27 @@ def _run_sync(task_name: str, sync_method: str) -> dict:
         session.rollback()
         SYNC_ERRORS.labels(task_name=task_name).inc()
         logger.error("sync_task_failed", task=task_name, error=str(exc))
+        raise
+    finally:
+        session.close()
+
+
+def _run_sync_all(full: bool = False) -> dict:
+    start = time.monotonic()
+    session = SyncSession()
+    try:
+        service = SyncService()
+        counts = service.sync_all(session, full=full)
+        session.commit()
+        duration = time.monotonic() - start
+        SYNC_DURATION.labels(task_name="sync_all").observe(duration)
+        logger.info("sync_all_complete", counts=counts, duration=duration)
+        _broadcast_sync("sync_all", sum(counts.values()))
+        return {"status": "success", "counts": counts, "duration": duration}
+    except Exception as exc:
+        session.rollback()
+        SYNC_ERRORS.labels(task_name="sync_all").inc()
+        logger.error("sync_all_failed", error=str(exc))
         raise
     finally:
         session.close()
@@ -122,5 +150,21 @@ def sync_threats(self):
 def sync_incidents(self):
     try:
         return _run_sync("sync_incidents", "sync_incidents")
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(name="app.tasks.celery_tasks.sync_events", bind=True, max_retries=3)
+def sync_events(self):
+    try:
+        return _run_sync("sync_events", "sync_activities")
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(name="app.tasks.celery_tasks.sync_all", bind=True, max_retries=2)
+def sync_all(self, full: bool = False):
+    try:
+        return _run_sync_all(full=full)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60)

@@ -10,6 +10,7 @@ import { ThreatsPage } from './pages/ThreatsPage';
 import { AnalystsPage } from './pages/AnalystsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { WallboardPage } from './pages/WallboardPage';
+import { EventsPage } from './pages/EventsPage';
 import { useAuthStore } from './stores/authStore';
 
 function WallboardRoute() {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/endpoints" element={<EndpointsPage />} />
+        <Route path="/events" element={<EventsPage />} />
         <Route path="/threats" element={<ThreatsPage />} />
         <Route path="/analysts" element={<AnalystsPage />} />
         <Route path="/settings" element={<SettingsPage />} />

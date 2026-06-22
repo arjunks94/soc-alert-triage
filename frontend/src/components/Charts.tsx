@@ -4,29 +4,68 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line,
 } from 'recharts';
 import { Card, CardContent, Typography, Box } from '@mui/material';
+import { getClassificationColor } from '../utils/classificationColors';
 import { severityColors } from '../theme';
 
 interface SeverityPieProps {
   data: { name: string; value: number }[];
   title?: string;
+  onSegmentClick?: (name: string) => void;
+  activeSegment?: string;
+  bare?: boolean;
 }
 
-export function SeverityPieChart({ data, title = 'Alert Severity Distribution' }: SeverityPieProps) {
+export function SeverityPieChart({
+  data,
+  title = 'Alert Severity Distribution',
+  onSegmentClick,
+  activeSegment,
+  bare = false,
+}: SeverityPieProps) {
+  const chart = (
+    <ResponsiveContainer width="100%" height={280}>
+      <PieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={60}
+          outerRadius={100}
+          dataKey="value"
+          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+          onClick={(_, index) => {
+            const entry = data[index];
+            if (entry && onSegmentClick) onSegmentClick(entry.name);
+          }}
+          style={{ cursor: onSegmentClick ? 'pointer' : 'default' }}
+        >
+          {data.map((entry) => {
+            const color = getClassificationColor(entry.name);
+            const isActive = !activeSegment || activeSegment === entry.name;
+            return (
+              <Cell
+                key={entry.name}
+                fill={color}
+                stroke={activeSegment === entry.name ? '#fff' : color}
+                strokeWidth={activeSegment === entry.name ? 3 : 1}
+                opacity={isActive ? 1 : 0.35}
+              />
+            );
+          })}
+        </Pie>
+        <Tooltip formatter={(value: number, name: string) => [value, name]} />
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+
+  if (bare) return chart;
+
   return (
     <Card>
       <CardContent>
-        <Typography variant="h6" gutterBottom>{title}</Typography>
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie data={data} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label>
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={severityColors[entry.name] || '#6b7280'} />
-              ))}
-            </Pie>
-            <Tooltip />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
+        {title && <Typography variant="h6" gutterBottom>{title}</Typography>}
+        {chart}
       </CardContent>
     </Card>
   );

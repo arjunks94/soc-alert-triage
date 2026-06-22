@@ -7,6 +7,7 @@ import type {
   Incident,
   LoginResponse,
   PaginatedResponse,
+  SecurityEvent,
   ThreatFeedItem,
   TimelinePoint,
   TopAsset,
@@ -33,8 +34,10 @@ export const dashboardApi = {
 };
 
 export const alertsApi = {
-  list: (params: Record<string, string | number>) =>
+  list: (params: Record<string, string | number | boolean>) =>
     api.get<PaginatedResponse<Alert>>('/alerts', { params }),
+  stats: () => api.get<{ total: number; critical: number; open: number; new: number }>('/alerts/stats'),
+  severities: () => api.get<{ name: string; count: number }[]>('/alerts/severities'),
   get: (id: string) => api.get<Alert>(`/alerts/${id}`),
   update: (id: string, data: Partial<Alert>) => api.patch<Alert>(`/alerts/${id}`, data),
   bulk: (data: { alert_ids: string[]; action: string; value?: string; analyst_id?: string }) =>
@@ -70,9 +73,38 @@ export interface EndpointStats {
 export const endpointsApi = {
   list: (params: Record<string, string | number | boolean>) =>
     api.get<PaginatedResponse<Endpoint>>('/endpoints', { params }),
+  get: (id: string) => api.get<Endpoint>(`/endpoints/${id}`),
   filters: () => api.get<EndpointFilterOptions>('/endpoints/filters'),
   stats: (params: Record<string, string | boolean>) =>
     api.get<EndpointStats>('/endpoints/stats', { params }),
+};
+
+export const eventsApi = {
+  list: (params: Record<string, string | number>) =>
+    api.get<PaginatedResponse<SecurityEvent>>('/events', { params }),
+  get: (id: string) => api.get<SecurityEvent>(`/events/${id}`),
+  stats: () => api.get<{ total: number; remote_desktop: number; by_category: Record<string, number> }>('/events/stats'),
+};
+
+export const syncApi = {
+  trigger: (full = false) =>
+    api.post<{
+      status: string;
+      task_id?: string;
+      mode?: string;
+      message?: string;
+      counts?: Record<string, number>;
+    }>(`/sync?full=${full}`),
+  status: () => api.get<{
+    configured: boolean;
+    api_healthy: boolean;
+    base_url: string | null;
+    running: boolean;
+    started_at?: string;
+    completed_at?: string;
+    counts?: Record<string, number>;
+    error?: string;
+  }>('/sync/status'),
 };
 
 export const usersApi = {
@@ -80,7 +112,16 @@ export const usersApi = {
 };
 
 export const threatsApi = {
-  list: () => api.get('/threats'),
+  list: (params: Record<string, string> = {}) =>
+    api.get<{
+      threats: Array<{
+        id: string; title: string; severity: string;
+        hostname?: string; status: string; created_at: string;
+      }>;
+      severity_distribution: Record<string, number>;
+      total: number;
+      filtered_total: number;
+    }>('/threats', { params }),
 };
 
 export const enrichmentApi = {

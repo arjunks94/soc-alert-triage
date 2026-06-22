@@ -1,6 +1,8 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -115,6 +117,19 @@ async def get_endpoint_stats(
         clean_filter(ip_address),
         online_only,
     )
+
+
+@endpoints_router.get("/{endpoint_id}", response_model=EndpointResponse)
+async def get_endpoint(
+    endpoint_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Endpoint).where(Endpoint.id == endpoint_id))
+    endpoint = result.scalar_one_or_none()
+    if not endpoint:
+        raise HTTPException(status_code=404, detail="Endpoint not found")
+    return EndpointResponse.model_validate(endpoint)
 
 
 @endpoints_router.get("", response_model=PaginatedResponse)

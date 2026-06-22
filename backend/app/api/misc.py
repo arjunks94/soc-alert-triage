@@ -34,39 +34,3 @@ async def list_users(
 ):
     result = await db.execute(select(User).where(User.is_active.is_(True)).order_by(User.name))
     return result.scalars().all()
-
-
-@router.get("/threats")
-async def list_threats(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    from app.models.models import Alert
-    from sqlalchemy import func
-
-    result = await db.execute(
-        select(Alert)
-        .where(Alert.sentinel_alert_id.like("threat-%"))
-        .order_by(Alert.created_at.desc())
-        .limit(100)
-    )
-    threats = result.scalars().all()
-    severity_counts = await db.execute(
-        select(Alert.severity, func.count(Alert.id))
-        .where(Alert.sentinel_alert_id.like("threat-%"))
-        .group_by(Alert.severity)
-    )
-    return {
-        "threats": [
-            {
-                "id": str(t.id),
-                "title": t.title,
-                "severity": t.severity,
-                "hostname": t.hostname,
-                "status": t.status,
-                "created_at": t.created_at.isoformat(),
-            }
-            for t in threats
-        ],
-        "severity_distribution": {row[0]: row[1] for row in severity_counts.all()},
-    }

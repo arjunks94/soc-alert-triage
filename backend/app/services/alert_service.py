@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Alert, Incident
 from app.schemas.schemas import AlertUpdate
-from app.utils.helpers import create_audit_log, generate_incident_number, normalize_severity
+from app.utils.helpers import create_audit_log, generate_incident_number, normalize_classification, normalize_severity
 from app.utils.sanitize import sanitize_search, sanitize_text
 
 
@@ -25,6 +25,7 @@ class AlertService:
         severity: Optional[str] = None,
         status: Optional[str] = None,
         analyst_id: Optional[UUID] = None,
+        open_only: bool = False,
     ) -> tuple[list[Alert], int]:
         query = select(Alert)
         count_query = select(func.count(Alert.id))
@@ -41,9 +42,11 @@ class AlertService:
                 )
             )
         if severity:
-            filters.append(Alert.severity == severity.upper())
+            filters.append(Alert.severity == normalize_classification(severity))
         if status:
             filters.append(Alert.status == status.upper())
+        if open_only:
+            filters.append(Alert.status.notin_(["CLOSED", "FALSE_POSITIVE"]))
         if analyst_id:
             filters.append(Alert.assigned_analyst_id == analyst_id)
 
@@ -58,6 +61,32 @@ class AlertService:
             .limit(page_size)
         )
         return list(result.scalars().all()), total
+
+    async def get_severities(self, db: AsyncSession) -> list[dict[str, Any]]:
+        result = await db.execute(
+            select(Alert.severity, func.count(Alert.id))
+            .group_by(Alert.severity)
+            .order_by(func.count(Alert.id).desc())
+        )
+        return [{"name": row[0], "count": row[1]} for row in result.all()]
+
+    async def get_stats(self, db: AsyncSession) -> dict[str, int]:
+        total = await db.scalar(select(func.count(Alert.id))) or 0
+        critical = await db.scalar(
+            select(func.count(Alert.id)).where(Alert.severity == "CRITICAL")
+        ) or 0
+        open_count = await db.scalar(
+            select(func.count(Alert.id)).where(Alert.status.notin_(["CLOSED", "FALSE_POSITIVE"]))
+        ) or 0
+        new_count = await db.scalar(
+            select(func.count(Alert.id)).where(Alert.status == "NEW")
+        ) or 0
+        return {
+            "total": total,
+            "critical": critical,
+            "open": open_count,
+            "new": new_count,
+        }
 
     async def get_alert(self, db: AsyncSession, alert_id: UUID) -> Optional[Alert]:
         result = await db.execute(select(Alert).where(Alert.id == alert_id))

@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { alertsApi, usersApi } from '../services/endpoints';
 import { SeverityChip, StatusChip } from '../components/SeverityChip';
 import { PageHeader } from '../components/ui/PageHeader';
+import { SyncRefreshButton } from '../components/SyncRefreshButton';
 import { StatCard } from '../components/ui/StatCard';
 import { GlassPanel, fieldSx } from '../components/ui/GlassPanel';
 import { StyledTable } from '../components/ui/StyledTable';
@@ -20,28 +21,46 @@ import type { Alert } from '../types';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const STATUSES = ['NEW', 'OPEN', 'INVESTIGATING', 'ESCALATED', 'CONTAINED', 'FALSE_POSITIVE', 'CLOSED'];
-const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+
+type CardFilter = 'all' | 'critical' | 'open' | 'selected';
 
 export function AlertsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
+  const [openOnly, setOpenOnly] = useState(false);
   const [analystId, setAnalystId] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [detailAlert, setDetailAlert] = useState<Alert | null>(null);
+  const [activeCard, setActiveCard] = useState<CardFilter>('all');
   const queryClient = useQueryClient();
 
-  useWebSocket('alerts', () => queryClient.invalidateQueries({ queryKey: ['alerts'] }));
+  useWebSocket('alerts', () => {
+    queryClient.invalidateQueries({ queryKey: ['alerts'] });
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['alerts', 'stats'],
+    queryFn: () => alertsApi.stats().then((r) => r.data),
+    refetchInterval: 30000,
+  });
+
+  const { data: severities } = useQuery({
+    queryKey: ['alerts', 'severities'],
+    queryFn: () => alertsApi.severities().then((r) => r.data),
+    refetchInterval: 60000,
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['alerts', page, search, severity, status, analystId],
+    queryKey: ['alerts', page, search, severity, status, openOnly, analystId],
     queryFn: () =>
       alertsApi.list({
         page, page_size: 25,
         ...(search && { search: sanitizeInput(search, 200) }),
         ...(severity && { severity }),
         ...(status && { status }),
+        ...(openOnly && { open_only: true }),
         ...(analystId && { analyst_id: analystId }),
       }).then((r) => r.data),
   });
@@ -65,37 +84,88 @@ export function AlertsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['incidents'] }),
   });
 
-  const criticalCount = data?.items?.filter((a) => a.severity === 'CRITICAL').length ?? 0;
-  const openCount = data?.items?.filter((a) => !['CLOSED', 'FALSE_POSITIVE'].includes(a.status)).length ?? 0;
+  const applyCardFilter = (filter: CardFilter) => {
+    setActiveCard(filter);
+    setPage(1);
+    if (filter === 'all') {
+      setSeverity('');
+      setStatus('');
+      setOpenOnly(false);
+    } else if (filter === 'critical') {
+      setSeverity('CRITICAL');
+      setStatus('');
+      setOpenOnly(false);
+    } else if (filter === 'open') {
+      setSeverity('');
+      setStatus('');
+      setOpenOnly(true);
+    }
+  };
+
+  const displayedItems = activeCard === 'selected'
+    ? data?.items?.filter((a) => selected.includes(a.id)) ?? []
+    : data?.items ?? [];
 
   return (
     <Box>
-      <PageHeader title="Alert Triage" subtitle="Investigate, assign, and resolve security alerts" gradient="linear-gradient(90deg, #f1f5f9, #ef4444)" />
+      <PageHeader title="Alert Triage" subtitle="Investigate, assign, and resolve security alerts" gradient="linear-gradient(90deg, #f1f5f9, #ef4444)" action={<SyncRefreshButton />} />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 2.5 }}>
-        <StatCard label="Total Results" value={data?.total ?? 0} color="#3b82f6" icon={<FilterAlt />} />
-        <StatCard label="Critical (page)" value={criticalCount} color="#ef4444" icon={<Warning />} />
-        <StatCard label="Open (page)" value={openCount} color="#f97316" icon={<Search />} />
-        <StatCard label="Selected" value={selected.length} color="#a855f7" icon={<FilterAlt />} />
+        <StatCard
+          label="Total Alerts"
+          value={stats?.total ?? data?.total ?? 0}
+          color="#3b82f6"
+          icon={<FilterAlt />}
+          active={activeCard === 'all'}
+          onClick={() => applyCardFilter('all')}
+        />
+        <StatCard
+          label="Critical"
+          value={stats?.critical ?? 0}
+          color="#ef4444"
+          icon={<Warning />}
+          active={activeCard === 'critical'}
+          onClick={() => applyCardFilter('critical')}
+        />
+        <StatCard
+          label="Open"
+          value={stats?.open ?? 0}
+          color="#f97316"
+          icon={<Search />}
+          active={activeCard === 'open'}
+          onClick={() => applyCardFilter('open')}
+        />
+        <StatCard
+          label="Selected"
+          value={selected.length}
+          color="#a855f7"
+          icon={<FilterAlt />}
+          active={activeCard === 'selected'}
+          onClick={() => setActiveCard('selected')}
+        />
       </Box>
 
       <GlassPanel title="Filters" accent="#ef4444" sx={{ mb: 2.5 }}>
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
           <TextField size="small" label="Search" value={search}
-            onChange={(e) => { setSearch(sanitizeInput(e.target.value, 200)); setPage(1); }}
+            onChange={(e) => { setSearch(sanitizeInput(e.target.value, 200)); setPage(1); setActiveCard('all'); }}
             sx={{ ...fieldSx, minWidth: 220 }}
             InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18 }} /></InputAdornment> }}
           />
-          <FormControl size="small" sx={{ ...fieldSx, minWidth: 120 }}>
-            <InputLabel>Severity</InputLabel>
-            <Select value={severity} label="Severity" onChange={(e) => { setSeverity(e.target.value); setPage(1); }}>
+          <FormControl size="small" sx={{ ...fieldSx, minWidth: 160 }}>
+            <InputLabel>Type / Severity</InputLabel>
+            <Select value={severity} label="Type / Severity" onChange={(e) => { setSeverity(e.target.value); setPage(1); setActiveCard('all'); }}>
               <MenuItem value="">All</MenuItem>
-              {SEVERITIES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+              {(severities || []).map((s) => (
+                <MenuItem key={s.name} value={s.name}>
+                  {s.name.replace(/_/g, ' ')} ({s.count})
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ ...fieldSx, minWidth: 140 }}>
             <InputLabel>Status</InputLabel>
-            <Select value={status} label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+            <Select value={status} label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); setOpenOnly(false); setActiveCard('all'); }}>
               <MenuItem value="">All</MenuItem>
               {STATUSES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
             </Select>
@@ -107,6 +177,11 @@ export function AlertsPage() {
               {(analysts || []).map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
             </Select>
           </FormControl>
+          {(severity || status || openOnly || activeCard !== 'all') && (
+            <Button size="small" onClick={() => applyCardFilter('all')} sx={{ alignSelf: 'center' }}>
+              Clear filters
+            </Button>
+          )}
         </Stack>
       </GlassPanel>
 
@@ -128,8 +203,8 @@ export function AlertsPage() {
 
       {isLoading ? (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>Loading alerts...</Typography>
-      ) : data?.items?.length === 0 ? (
-        <EmptyState icon={<Warning />} message="No alerts match your filters" />
+      ) : displayedItems.length === 0 ? (
+        <EmptyState icon={<Warning />} message={activeCard === 'selected' ? 'No alerts selected' : 'No alerts match your filters'} />
       ) : (
         <StyledTable>
           <Table size="small">
@@ -137,8 +212,10 @@ export function AlertsPage() {
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    checked={!!data?.items?.length && selected.length === data.items.length}
-                    onChange={() => setSelected(selected.length === (data?.items?.length ?? 0) ? [] : data!.items.map((a) => a.id))}
+                    checked={!!displayedItems.length && selected.length === displayedItems.length}
+                    onChange={() => setSelected(
+                      selected.length === displayedItems.length ? [] : displayedItems.map((a) => a.id),
+                    )}
                   />
                 </TableCell>
                 {['Severity', 'Title', 'Hostname', 'Status', 'Created'].map((h) => (
@@ -147,7 +224,7 @@ export function AlertsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data?.items?.map((alert) => (
+              {displayedItems.map((alert) => (
                 <TableRow key={alert.id} hover sx={{ cursor: 'pointer' }}
                   onClick={() => setDetailAlert(alert)} selected={selected.includes(alert.id)}>
                   <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
@@ -168,7 +245,7 @@ export function AlertsPage() {
         </StyledTable>
       )}
 
-      {data && data.pages > 1 && (
+      {activeCard !== 'selected' && data && data.pages > 1 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
           <Pagination count={data.pages} page={page} onChange={(_, p) => setPage(p)} color="primary" shape="rounded" />
         </Box>

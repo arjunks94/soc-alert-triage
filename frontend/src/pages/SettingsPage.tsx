@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { enrichmentApi } from '../services/endpoints';
 import { PageHeader } from '../components/ui/PageHeader';
 import { GlassPanel, fieldSx } from '../components/ui/GlassPanel';
+import { SyncRefreshButton } from '../components/SyncRefreshButton';
 import { sanitizeInput } from '../utils/sanitize';
 
 export function SettingsPage() {
@@ -33,6 +34,7 @@ export function SettingsPage() {
         title="Settings"
         subtitle="IOC enrichment and system configuration"
         gradient="linear-gradient(90deg, #f1f5f9, #22c55e)"
+        action={<SyncRefreshButton full label="Full Sync" />}
       />
 
       <GlassPanel title="IOC Enrichment" accent="#22c55e" sx={{ mb: 2.5 }}>
@@ -71,7 +73,10 @@ export function SettingsPage() {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Typography variant="body2"><strong>Version:</strong> 1.0.0</Typography>
           <Typography variant="body2"><strong>Integration:</strong> SentinelOne Cloud API v2.1</Typography>
-          <Typography variant="body2"><strong>Sync Intervals:</strong> Alerts 60s · Agents 5m · Incidents 2m</Typography>
+          <Typography variant="body2"><strong>Sync Intervals:</strong> Alerts 60s · Agents 5m · Incidents 2m · Events 5m</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Use the Full Sync button above to manually pull latest data from SentinelOne API.
+          </Typography>
           <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
             <Security sx={{ fontSize: 16, color: '#22c55e' }} />
             All API endpoints require JWT authentication

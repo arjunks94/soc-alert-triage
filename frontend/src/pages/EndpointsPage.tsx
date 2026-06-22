@@ -3,9 +3,10 @@ import {
   Box, Pagination, Skeleton, ToggleButton, ToggleButtonGroup,
   Chip, InputAdornment, TextField,
   Table, TableBody, TableCell, TableHead, TableRow,
+  Drawer, IconButton, Typography, Stack,
 } from '@mui/material';
 import {
-  ViewModule, ViewList, Computer, Wifi, WifiOff, Search,
+  ViewModule, ViewList, Computer, Wifi, WifiOff, Search, Close,
 } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -19,13 +20,16 @@ import { StatCard } from '../components/ui/StatCard';
 import { StyledTable } from '../components/ui/StyledTable';
 import { EmptyState } from '../components/ui/EmptyState';
 import { fieldSx } from '../components/ui/GlassPanel';
+import { SyncRefreshButton } from '../components/SyncRefreshButton';
 import { sanitizeInput } from '../utils/sanitize';
+import type { Endpoint } from '../types';
 
 export function EndpointsPage() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<EndpointFilters>(emptyFilters);
   const [view, setView] = useState<'grid' | 'table'>('grid');
   const [quickSearch, setQuickSearch] = useState('');
+  const [detailEndpoint, setDetailEndpoint] = useState<Endpoint | null>(null);
 
   const mergedFilters = useMemo(() => ({
     ...filters,
@@ -72,6 +76,7 @@ export function EndpointsPage() {
         title="Endpoint Fleet"
         subtitle="Monitor and filter managed endpoints synced from SentinelOne"
         gradient="linear-gradient(90deg, #f1f5f9, #3b82f6)"
+        action={<SyncRefreshButton />}
       />
 
       <Box
@@ -172,7 +177,11 @@ export function EndpointsPage() {
             gap: 2,
           }}
         >
-          {data?.items?.map((ep) => <EndpointCard key={ep.id} endpoint={ep} />)}
+          {data?.items?.map((ep) => (
+            <Box key={ep.id} onClick={() => setDetailEndpoint(ep)} sx={{ cursor: 'pointer' }}>
+              <EndpointCard endpoint={ep} />
+            </Box>
+          ))}
         </Box>
       ) : (
         <StyledTable>
@@ -186,7 +195,7 @@ export function EndpointsPage() {
             </TableHead>
             <TableBody>
               {data?.items?.map((ep) => (
-                <TableRow key={ep.id} hover>
+                <TableRow key={ep.id} hover sx={{ cursor: 'pointer' }} onClick={() => setDetailEndpoint(ep)}>
                   <TableCell>
                     <Chip
                       label={ep.is_online ? 'Online' : 'Offline'}
@@ -228,6 +237,55 @@ export function EndpointsPage() {
           />
         </Box>
       )}
+
+      <Drawer
+        anchor="right"
+        open={!!detailEndpoint}
+        onClose={() => setDetailEndpoint(null)}
+        PaperProps={{ sx: { width: 520, p: 3, bgcolor: '#0d1117' } }}
+      >
+        {detailEndpoint && (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6" fontWeight={700}>Endpoint Details</Typography>
+              <IconButton onClick={() => setDetailEndpoint(null)}><Close /></IconButton>
+            </Box>
+            <Stack spacing={1.5} sx={{ mb: 2 }}>
+              <Typography variant="body2"><strong>Hostname:</strong> {detailEndpoint.hostname || '-'}</Typography>
+              <Typography variant="body2"><strong>IP:</strong> {detailEndpoint.ip_address || '-'}</Typography>
+              <Typography variant="body2"><strong>OS:</strong> {detailEndpoint.os_name} {detailEndpoint.os_version}</Typography>
+              <Typography variant="body2"><strong>Agent ID:</strong> {detailEndpoint.agent_id}</Typography>
+              <Typography variant="body2"><strong>Group:</strong> {detailEndpoint.group_name || '-'}</Typography>
+              <Typography variant="body2"><strong>Site:</strong> {detailEndpoint.site_name || '-'}</Typography>
+              <Typography variant="body2"><strong>Status:</strong> {detailEndpoint.is_online ? 'Online' : 'Offline'}</Typography>
+            </Stack>
+            {detailEndpoint.raw_data ? (
+              <>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>SentinelOne API Response</Typography>
+                <Box
+                  component="pre"
+                  sx={{
+                    bgcolor: 'rgba(0,0,0,0.3)',
+                    p: 2,
+                    borderRadius: 2,
+                    overflow: 'auto',
+                    fontSize: '0.75rem',
+                    fontFamily: 'monospace',
+                    maxHeight: 500,
+                    border: '1px solid rgba(59,130,246,0.15)',
+                  }}
+                >
+                  {JSON.stringify(detailEndpoint.raw_data, null, 2)}
+                </Box>
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Full API response not yet synced. Click Refresh from SentinelOne to fetch.
+              </Typography>
+            )}
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 }

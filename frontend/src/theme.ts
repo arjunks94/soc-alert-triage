@@ -54,7 +54,10 @@ export const severityColors: Record<string, string> = {
   HIGH: '#f97316',
   MEDIUM: '#eab308',
   LOW: '#3b82f6',
+  INFO: '#6b7280',
 };
+
+export { classificationColors, getClassificationColor, formatClassificationLabel } from './utils/classificationColors';
 
 export const statusColors: Record<string, string> = {
   NEW: '#3b82f6',

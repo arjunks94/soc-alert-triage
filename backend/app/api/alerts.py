@@ -22,6 +22,22 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
 alert_service = AlertService()
 
 
+@router.get("/severities")
+async def alert_severities(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await alert_service.get_severities(db)
+
+
+@router.get("/stats")
+async def alert_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    return await alert_service.get_stats(db)
+
+
 @router.get("", response_model=PaginatedResponse)
 async def list_alerts(
     page: int = Query(1, ge=1),
@@ -30,11 +46,12 @@ async def list_alerts(
     severity: Optional[str] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
     analyst_id: Optional[UUID] = None,
+    open_only: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     alerts, total = await alert_service.list_alerts(
-        db, page, page_size, clean_search(search), severity, status_filter, analyst_id
+        db, page, page_size, clean_search(search), severity, status_filter, analyst_id, open_only
     )
     return PaginatedResponse(
         items=[AlertResponse.model_validate(a) for a in alerts],

@@ -14,6 +14,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { GlassPanel } from '../components/ui/GlassPanel';
 import { dashboardApi } from '../services/endpoints';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { SyncRefreshButton } from '../components/SyncRefreshButton';
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
@@ -66,6 +67,7 @@ export function DashboardPage() {
         title="Security Operations"
         subtitle="Real-time threat monitoring and alert triage"
         gradient="linear-gradient(90deg, #f1f5f9, #3b82f6, #a855f7)"
+        action={<SyncRefreshButton />}
       />
 
       <Grid container spacing={2} sx={{ mb: 3 }}>

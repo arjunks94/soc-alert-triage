@@ -6,7 +6,9 @@ from app.utils.helpers import generate_incident_number, normalize_severity
 def test_normalize_severity():
     assert normalize_severity("critical") == "CRITICAL"
     assert normalize_severity("HIGH") == "HIGH"
-    assert normalize_severity("info") == "LOW"
+    assert normalize_severity("info") == "INFO"
+    assert normalize_severity("Malware") == "MALWARE"
+    assert normalize_severity("Ransomware") == "RANSOMWARE"
 
 
 def test_generate_incident_number():

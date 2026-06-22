@@ -87,11 +87,17 @@ class SentinelOneClient:
                 logger.error("s1_request_error", endpoint=endpoint, error=str(exc))
                 raise SentinelOneAPIError(f"Request failed: {exc}") from exc
 
-    async def _paginate(self, endpoint: str, params: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
+    async def _paginate(
+        self,
+        endpoint: str,
+        params: Optional[dict[str, Any]] = None,
+        max_pages: Optional[int] = 50,
+    ) -> list[dict[str, Any]]:
         all_items: list[dict[str, Any]] = []
         cursor: Optional[str] = None
         base_params = dict(params or {})
         base_params["limit"] = self._page_size
+        pages = 0
 
         while True:
             request_params = dict(base_params)
@@ -102,32 +108,36 @@ class SentinelOneClient:
             pagination = data.get("pagination", {})
             items = self._extract_items(data)
             all_items.extend(items)
+            pages += 1
 
             cursor = pagination.get("nextCursor")
             if not cursor or not items:
                 break
+            if max_pages is not None and pages >= max_pages:
+                logger.info("s1_paginate_max_pages", endpoint=endpoint, pages=pages)
+                break
 
-        logger.info("s1_paginate_complete", endpoint=endpoint, count=len(all_items))
+        logger.info("s1_paginate_complete", endpoint=endpoint, count=len(all_items), pages=pages)
         return all_items
 
     @staticmethod
     def _extract_items(data: dict[str, Any]) -> list[dict[str, Any]]:
-        for key in ("data", "threats", "agents", "sites", "incidents"):
+        for key in ("data", "threats", "agents", "sites", "incidents", "activities"):
             if key in data and isinstance(data[key], list):
                 return data[key]
         return []
 
-    async def get_alerts(self, **filters: Any) -> list[dict[str, Any]]:
+    async def get_alerts(self, max_pages: Optional[int] = 50, **filters: Any) -> list[dict[str, Any]]:
         params = {"sortOrder": "desc", **filters}
-        return await self._paginate("/cloud-detection/alerts", params)
+        return await self._paginate("/cloud-detection/alerts", params, max_pages=max_pages)
 
-    async def get_threats(self, **filters: Any) -> list[dict[str, Any]]:
+    async def get_threats(self, max_pages: Optional[int] = 50, **filters: Any) -> list[dict[str, Any]]:
         params = {"sortBy": "createdAt", "sortOrder": "desc", **filters}
-        return await self._paginate("/threats", params)
+        return await self._paginate("/threats", params, max_pages=max_pages)
 
-    async def get_agents(self, **filters: Any) -> list[dict[str, Any]]:
+    async def get_agents(self, max_pages: Optional[int] = 50, **filters: Any) -> list[dict[str, Any]]:
         params = {"sortBy": "lastActiveDate", "sortOrder": "desc", **filters}
-        return await self._paginate("/agents", params)
+        return await self._paginate("/agents", params, max_pages=max_pages)
 
     async def get_sites(self, **filters: Any) -> list[dict[str, Any]]:
         params = {"sortBy": "name", "sortOrder": "asc", **filters}
@@ -140,6 +150,23 @@ class SentinelOneClient:
         except Exception as exc:
             logger.warning("s1_incidents_not_available", error=str(exc))
             return []
+
+    async def get_activities(self, max_pages: Optional[int] = 20, **filters: Any) -> list[dict[str, Any]]:
+        params = {"sortBy": "createdAt", "sortOrder": "desc", **filters}
+        return await self._paginate("/activities", params, max_pages=max_pages)
+
+    async def get_activity_types(self) -> dict[int, str]:
+        try:
+            data = await self._request("GET", "/activities/types")
+            items = data.get("data", [])
+            return {
+                int(item["id"]): str(item.get("name", item.get("activityType", f"Type {item['id']}")))
+                for item in items
+                if item.get("id") is not None
+            }
+        except Exception as exc:
+            logger.warning("s1_activity_types_not_available", error=str(exc))
+            return {}
 
     async def health_check(self) -> bool:
         try:

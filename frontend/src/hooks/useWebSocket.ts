@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 
 type MessageHandler = (data: Record<string, unknown>) => void;
 
-export function useWebSocket(channel: 'alerts' | 'incidents' | 'dashboard', onMessage: MessageHandler) {
+export function useWebSocket(channel: 'alerts' | 'incidents' | 'dashboard' | 'events', onMessage: MessageHandler) {
   const wsRef = useRef<WebSocket | null>(null);
   const handlerRef = useRef(onMessage);
   handlerRef.current = onMessage;

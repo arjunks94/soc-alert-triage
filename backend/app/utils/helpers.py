@@ -28,15 +28,23 @@ async def create_audit_log(
     return log
 
 
-def normalize_severity(severity: str) -> str:
-    mapping = {
+def normalize_classification(value: str) -> str:
+    """Normalize SentinelOne severity or threat classification for storage."""
+    if not value or not str(value).strip():
+        return "UNKNOWN"
+    cleaned = str(value).strip().upper().replace(" ", "_").replace("-", "_")
+    standard = {
         "critical": "CRITICAL",
         "high": "HIGH",
         "medium": "MEDIUM",
         "low": "LOW",
-        "info": "LOW",
+        "info": "INFO",
     }
-    return mapping.get(severity.lower(), severity.upper())
+    return standard.get(cleaned.lower(), cleaned)
+
+
+def normalize_severity(severity: str) -> str:
+    return normalize_classification(severity)
 
 
 def generate_incident_number() -> str:

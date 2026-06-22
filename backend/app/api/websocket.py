@@ -21,6 +21,7 @@ class ConnectionManager:
             "alerts": set(),
             "incidents": set(),
             "dashboard": set(),
+            "events": set(),
         }
 
     async def connect(self, channel: str, websocket: WebSocket) -> None:
@@ -93,3 +94,8 @@ async def websocket_incidents(websocket: WebSocket, token: Optional[str] = Query
 @router.websocket("/ws/dashboard")
 async def websocket_dashboard(websocket: WebSocket, token: Optional[str] = Query(None)):
     await _ws_handler(websocket, "dashboard")
+
+
+@router.websocket("/ws/events")
+async def websocket_events(websocket: WebSocket, token: Optional[str] = Query(None)):
+    await _ws_handler(websocket, "events")

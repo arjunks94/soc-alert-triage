@@ -71,7 +71,7 @@ class AlertUpdate(BaseModel):
     status: Optional[str] = Field(None, pattern="^(NEW|OPEN|INVESTIGATING|ESCALATED|CONTAINED|FALSE_POSITIVE|CLOSED)$")
     assigned_analyst_id: Optional[UUID] = None
     notes: Optional[str] = Field(None, max_length=5000)
-    severity: Optional[str] = Field(None, pattern="^(CRITICAL|HIGH|MEDIUM|LOW)$")
+    severity: Optional[str] = Field(None, max_length=50)
 
 
 class AlertResponse(AlertBase):
@@ -106,6 +106,32 @@ class EndpointResponse(BaseModel):
     is_online: bool
     group_name: Optional[str] = None
     site_name: Optional[str] = None
+    raw_data: Optional[dict[str, Any]] = None
+
+
+class SecurityEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sentinel_event_id: str
+    event_type: str
+    category: str
+    title: str
+    description: Optional[str] = None
+    hostname: Optional[str] = None
+    agent_id: Optional[str] = None
+    user_name: Optional[str] = None
+    site_name: Optional[str] = None
+    severity: str
+    event_at: datetime
+    raw_data: Optional[dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SyncResponse(BaseModel):
+    status: str
+    counts: dict[str, int]
 
 
 class IncidentBase(BaseModel):

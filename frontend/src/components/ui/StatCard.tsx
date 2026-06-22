@@ -6,24 +6,32 @@ interface StatCardProps {
   value: number | string;
   color: string;
   icon: ReactNode;
+  onClick?: () => void;
+  active?: boolean;
 }
 
-export function StatCard({ label, value, color, icon }: StatCardProps) {
+export function StatCard({ label, value, color, icon, onClick, active }: StatCardProps) {
   return (
     <Box
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
       sx={{
         p: 2,
         borderRadius: 3,
         background: `linear-gradient(135deg, ${color}12 0%, rgba(0,0,0,0.3) 100%)`,
-        border: `1px solid ${color}33`,
+        border: `1px solid ${active ? color : `${color}33`}`,
         display: 'flex',
         alignItems: 'center',
         gap: 1.5,
         transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': {
+        cursor: onClick ? 'pointer' : 'default',
+        outline: active ? `2px solid ${color}55` : 'none',
+        '&:hover': onClick ? {
           transform: 'translateY(-2px)',
           boxShadow: `0 8px 24px ${color}22`,
-        },
+        } : {},
       }}
     >
       <Box

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import make_asgi_app
 from sqlalchemy import text
 
-from app.api import alerts, auth, dashboard, incidents, misc, websocket
+from app.api import alerts, auth, dashboard, events, incidents, misc, sync, threats, websocket
 from app.api.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -65,6 +65,9 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(dashboard.endpoints_router, prefix="/api")
     app.include_router(misc.router, prefix="/api")
+    app.include_router(sync.router, prefix="/api")
+    app.include_router(events.router, prefix="/api")
+    app.include_router(threats.router, prefix="/api")
     app.include_router(websocket.router)
 
     metrics_app = make_asgi_app()
