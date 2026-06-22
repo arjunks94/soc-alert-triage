@@ -83,7 +83,7 @@ def _run_sync(task_name: str, sync_method: str, **kwargs) -> dict:
     start = time.monotonic()
     session = SyncSession()
     try:
-        service = SyncService()
+        service = SyncService(session)
         method = getattr(service, sync_method)
         count = method(session, **kwargs)
         session.commit()
@@ -105,7 +105,7 @@ def _run_sync_all(full: bool = False) -> dict:
     start = time.monotonic()
     session = SyncSession()
     try:
-        service = SyncService()
+        service = SyncService(session)
         counts = service.sync_all(session, full=full)
         session.commit()
         duration = time.monotonic() - start

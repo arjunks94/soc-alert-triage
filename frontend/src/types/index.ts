@@ -75,6 +75,8 @@ export interface SecurityEvent {
   agent_id?: string;
   user_name?: string;
   site_name?: string;
+  source_ip?: string;
+  dest_host?: string;
   severity: string;
   event_at: string;
   raw_data?: Record<string, unknown>;

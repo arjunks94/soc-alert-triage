@@ -103,7 +103,7 @@ export function EventsPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {['Category', 'Type', 'Title', 'Hostname', 'User', 'Event Time'].map((h) => (
+                {['Category', 'Event', 'User', 'Source IP', 'Dest Host', 'Site', 'Event Time'].map((h) => (
                   <TableCell key={h}>{h.toUpperCase()}</TableCell>
                 ))}
               </TableRow>
@@ -131,14 +131,15 @@ export function EventsPage() {
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ fontSize: '0.8rem' }}>{event.event_type}</TableCell>
-                  <TableCell sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>
-                    {event.title}
+                  <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600 }}>{event.title}</TableCell>
+                  <TableCell sx={{ fontSize: '0.8rem' }}>{event.user_name || '-'}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#06b6d4' }}>
+                    {event.source_ip || '-'}
                   </TableCell>
                   <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                    {event.hostname || '-'}
+                    {event.dest_host || event.hostname || '-'}
                   </TableCell>
-                  <TableCell sx={{ fontSize: '0.8rem' }}>{event.user_name || '-'}</TableCell>
+                  <TableCell sx={{ fontSize: '0.8rem' }}>{event.site_name || '-'}</TableCell>
                   <TableCell sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
                     {format(new Date(event.event_at), 'MMM d, yyyy HH:mm')}
                   </TableCell>
@@ -176,7 +177,8 @@ export function EventsPage() {
             <Stack spacing={1.5} sx={{ mb: 2 }}>
               <Typography variant="body2"><strong>Type:</strong> {detailEvent.event_type}</Typography>
               <Typography variant="body2"><strong>Category:</strong> {detailEvent.category}</Typography>
-              <Typography variant="body2"><strong>Hostname:</strong> {detailEvent.hostname || '-'}</Typography>
+              <Typography variant="body2"><strong>Source IP:</strong> {detailEvent.source_ip || '-'}</Typography>
+              <Typography variant="body2"><strong>Dest Host:</strong> {detailEvent.dest_host || detailEvent.hostname || '-'}</Typography>
               <Typography variant="body2"><strong>User:</strong> {detailEvent.user_name || '-'}</Typography>
               <Typography variant="body2"><strong>Site:</strong> {detailEvent.site_name || '-'}</Typography>
               <Typography variant="body2">

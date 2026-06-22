@@ -38,7 +38,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
-    role: Optional[str] = None
+    role: Optional[str] = Field(None, pattern="^(SOC_ADMIN|SOC_MANAGER|SOC_ANALYST|VIEWER)$")
     is_active: Optional[bool] = None
 
 
@@ -122,6 +122,8 @@ class SecurityEventResponse(BaseModel):
     agent_id: Optional[str] = None
     user_name: Optional[str] = None
     site_name: Optional[str] = None
+    source_ip: Optional[str] = None
+    dest_host: Optional[str] = None
     severity: str
     event_at: datetime
     raw_data: Optional[dict[str, Any]] = None

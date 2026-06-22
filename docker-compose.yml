@@ -44,7 +44,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
       ADMIN_NAME: ${ADMIN_NAME:-SOC Admin}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      CORS_ORIGINS: '["http://localhost","http://localhost:80"]'
+      CORS_ORIGINS: '["http://localhost","http://localhost:80","http://localhost:8080"]'
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,6 +106,17 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${NGINX_PORT:-80}:80"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  wallboard:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "${WALLBOARD_PORT:-8080}:80"
     depends_on:
       - backend
       - frontend

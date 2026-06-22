@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { useWallboardAuthStore } from '../stores/wallboardAuthStore';
+import { isWallboardHost } from '../utils/wallboard';
 
 type MessageHandler = (data: Record<string, unknown>) => void;
 
@@ -7,7 +9,9 @@ export function useWebSocket(channel: 'alerts' | 'incidents' | 'dashboard' | 'ev
   const wsRef = useRef<WebSocket | null>(null);
   const handlerRef = useRef(onMessage);
   handlerRef.current = onMessage;
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const mainToken = useAuthStore((s) => s.accessToken);
+  const wallboardToken = useWallboardAuthStore((s) => s.accessToken);
+  const accessToken = isWallboardHost() ? wallboardToken : mainToken;
 
   const connect = useCallback(() => {
     if (!accessToken) return;
@@ -41,4 +45,6 @@ export function useWebSocket(channel: 'alerts' | 'incidents' | 'dashboard' | 'ev
       wsRef.current?.close();
     };
   }, [connect]);
+
+  return wsRef;
 }

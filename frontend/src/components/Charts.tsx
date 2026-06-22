@@ -104,6 +104,19 @@ interface HeatmapProps {
 }
 
 export function MitreHeatmap({ data }: HeatmapProps) {
+  if (!data.length) {
+    return (
+      <Card>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>MITRE ATT&CK Heatmap</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+            No MITRE mapping data yet. Run a SentinelOne sync to populate tactics and techniques.
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const maxCount = Math.max(...data.map((d) => d.count), 1);
   const tactics = [...new Set(data.map((d) => d.tactic))].slice(0, 8);
   const techniques = [...new Set(data.map((d) => d.technique))].slice(0, 10);

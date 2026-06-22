@@ -27,8 +27,8 @@ async def enrich_ioc(
     )
 
 
-@router.get("/users", response_model=list[UserResponse])
-async def list_users(
+@router.get("/users", response_model=list[UserResponse], deprecated=True)
+async def list_users_legacy(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):

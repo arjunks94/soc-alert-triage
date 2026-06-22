@@ -15,10 +15,20 @@ import { GlassPanel } from '../components/ui/GlassPanel';
 import { dashboardApi } from '../services/endpoints';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { SyncRefreshButton } from '../components/SyncRefreshButton';
+import { usePermissions } from '../hooks/usePermissions';
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
-  useWebSocket('dashboard', () => queryClient.invalidateQueries({ queryKey: ['dashboard'] }));
+  const { hasAccess } = usePermissions();
+  useWebSocket('dashboard', (msg) => {
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    if (msg.type === 'sync_complete') {
+      queryClient.invalidateQueries({ queryKey: ['wallboard'] });
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['threats'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+    }
+  });
 
   const { data: summary } = useQuery({
     queryKey: ['dashboard', 'summary'],
@@ -67,7 +77,7 @@ export function DashboardPage() {
         title="Security Operations"
         subtitle="Real-time threat monitoring and alert triage"
         gradient="linear-gradient(90deg, #f1f5f9, #3b82f6, #a855f7)"
-        action={<SyncRefreshButton />}
+        action={hasAccess('sync', 'edit') ? <SyncRefreshButton /> : undefined}
       />
 
       <Grid container spacing={2} sx={{ mb: 3 }}>

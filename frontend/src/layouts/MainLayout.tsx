@@ -7,22 +7,25 @@ import {
   Tv, Menu as MenuIcon, Logout, Event,
 } from '@mui/icons-material';
 import { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/authStore';
+import { APP_MODULES } from '../constants/rbac';
+import { usePermissions } from '../hooks/usePermissions';
+import type { ModuleId } from '../constants/rbac';
 
 const DRAWER_WIDTH = 240;
 
 const navItems = [
-  { label: 'Dashboard', path: '/', icon: <Dashboard /> },
-  { label: 'Alerts', path: '/alerts', icon: <Warning /> },
-  { label: 'Incidents', path: '/incidents', icon: <Report /> },
-  { label: 'Endpoints', path: '/endpoints', icon: <Computer /> },
-  { label: 'Events', path: '/events', icon: <Event /> },
-  { label: 'Threats', path: '/threats', icon: <Security /> },
-  { label: 'Analysts', path: '/analysts', icon: <People /> },
-  { label: 'Wallboard', path: '/wallboard', icon: <Tv /> },
-  { label: 'Settings', path: '/settings', icon: <Settings /> },
+  { label: 'Dashboard', path: '/', icon: <Dashboard />, module: 'dashboard' as ModuleId },
+  { label: 'Alerts', path: '/alerts', icon: <Warning />, module: 'alerts' as ModuleId },
+  { label: 'Incidents', path: '/incidents', icon: <Report />, module: 'incidents' as ModuleId },
+  { label: 'Endpoints', path: '/endpoints', icon: <Computer />, module: 'endpoints' as ModuleId },
+  { label: 'Events', path: '/events', icon: <Event />, module: 'events' as ModuleId },
+  { label: 'Threats', path: '/threats', icon: <Security />, module: 'threats' as ModuleId },
+  { label: 'Analysts', path: '/analysts', icon: <People />, module: 'analysts' as ModuleId },
+  { label: 'Wallboard', path: '/wallboard', icon: <Tv />, module: 'wallboard' as ModuleId },
+  { label: 'Settings', path: '/settings', icon: <Settings />, module: 'settings' as ModuleId },
 ];
 
 export function MainLayout() {
@@ -30,7 +33,18 @@ export function MainLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { hasAccess, isLoading } = usePermissions();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const visibleNav = navItems.filter((item) => hasAccess(item.module, 'view'));
+  const currentModule = APP_MODULES.find((m) => m.path === location.pathname);
+
+  if (!isLoading && currentModule && !hasAccess(currentModule.id, 'view')) {
+    const fallback = visibleNav[0]?.path ?? '/';
+    if (fallback !== location.pathname) {
+      return <Navigate to={fallback} replace />;
+    }
+  }
 
   const handleLogout = () => {
     logout();
@@ -78,7 +92,7 @@ export function MainLayout() {
         }}
       >
         <List>
-          {navItems.map((item) => (
+          {visibleNav.map((item) => (
             <ListItemButton
               key={item.path}
               selected={location.pathname === item.path}

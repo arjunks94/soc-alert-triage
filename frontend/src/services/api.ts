@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { useAuthStore } from '../stores/authStore';
+import { getAuthStore } from '../stores/getAuthStore';
+import { isWallboardHost } from '../utils/wallboard';
 
 const api = axios.create({
   baseURL: '/api',
@@ -7,7 +8,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken;
+  const token = getAuthStore().getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -17,14 +18,17 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken, setTokens, logout } = useAuthStore.getState();
+  const store = getAuthStore().getState();
+  const { refreshToken, setTokens, logout } = store;
   if (!refreshToken) return null;
   try {
     const { data } = await axios.post('/api/auth/refresh', { refresh_token: refreshToken });
     setTokens(data.access_token, data.refresh_token);
     return data.access_token;
   } catch {
-    logout();
+    if (!isWallboardHost()) {
+      logout();
+    }
     return null;
   }
 }
@@ -41,7 +45,9 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       }
-      window.location.href = '/login';
+      if (!isWallboardHost()) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

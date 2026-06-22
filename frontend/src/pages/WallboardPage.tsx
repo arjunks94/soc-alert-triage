@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
+import { Refresh } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi, threatsApi, alertsApi } from '../services/endpoints';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { SyncRefreshButton } from '../components/SyncRefreshButton';
 import { WallboardCenter } from '../components/wallboard/WallboardCenter';
 import { WallboardThreatFeed } from '../components/wallboard/WallboardThreatFeed';
 import { WallboardAttackTypes } from '../components/wallboard/WallboardAttackTypes';
@@ -15,17 +17,45 @@ import {
 } from '../components/wallboard/WallboardRightColumn';
 import { WallboardFooter } from '../components/wallboard/WallboardFooter';
 
+const REFRESH_SECONDS = 15;
+
 export function WallboardPage() {
   const queryClient = useQueryClient();
   const [clock, setClock] = useState(new Date());
+  const [countdown, setCountdown] = useState(REFRESH_SECONDS);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshWallboard = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['wallboard'] });
+    setCountdown(REFRESH_SECONDS);
+    setRefreshing(false);
+  }, [queryClient]);
 
   useEffect(() => {
     const id = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  useWebSocket('dashboard', () => {
-    queryClient.invalidateQueries({ queryKey: ['wallboard'] });
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          queryClient.invalidateQueries({ queryKey: ['wallboard'] });
+          return REFRESH_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [queryClient]);
+
+  useWebSocket('dashboard', (msg) => {
+    if (msg.type === 'sync_complete') {
+      queryClient.invalidateQueries({ queryKey: ['wallboard'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setCountdown(REFRESH_SECONDS);
+    }
   });
 
   const { data: summary } = useQuery({
@@ -139,8 +169,21 @@ export function WallboardPage() {
           {clock.toLocaleTimeString()}
         </Typography>
         <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em' }}>
-          REFRESH 15s · SENTINELONE
+          NEXT REFRESH {countdown}s · AUTO 15s
         </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Tooltip title="Refresh wallboard data now">
+            <IconButton
+              size="small"
+              onClick={refreshWallboard}
+              disabled={refreshing}
+              sx={{ color: '#3b82f6' }}
+            >
+              <Refresh fontSize="small" sx={{ animation: refreshing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } }} />
+            </IconButton>
+          </Tooltip>
+          <SyncRefreshButton size="small" label="Sync S1" />
+        </Box>
       </Box>
 
       {/* Main 3-column grid */}

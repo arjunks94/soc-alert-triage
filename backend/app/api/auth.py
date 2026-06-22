@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    create_wallboard_access_token,
+    create_wallboard_refresh_token,
     decode_token,
     get_current_user,
     get_password_hash,
@@ -36,6 +38,24 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.post("/wallboard-login", response_model=Token)
+async def wallboard_login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Long-lived tokens for dedicated wallboard displays (kiosk mode)."""
+    result = await db.execute(select(User).where(User.email == request.email))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+
+    token_data = {"sub": str(user.id), "role": user.role}
+    await create_audit_log(db, "WALLBOARD_LOGIN", f"user:{user.id}", user_id=user.id)
+    return Token(
+        access_token=create_wallboard_access_token(token_data),
+        refresh_token=create_wallboard_refresh_token(token_data),
+    )
+
+
 @router.post("/refresh", response_model=Token)
 async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
@@ -43,6 +63,7 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = payload.get("sub")
+        is_wallboard = bool(payload.get("wallboard"))
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
 
@@ -52,6 +73,11 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
     token_data = {"sub": str(user.id), "role": user.role}
+    if is_wallboard:
+        return Token(
+            access_token=create_wallboard_access_token(token_data),
+            refresh_token=create_wallboard_refresh_token(token_data),
+        )
     return Token(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),

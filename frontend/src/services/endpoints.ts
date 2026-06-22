@@ -1,4 +1,5 @@
 import api from './api';
+import axios from 'axios';
 import type {
   Alert,
   DashboardSummary,
@@ -17,7 +18,11 @@ import type {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<LoginResponse>('/auth/login', { email, password }),
+  wallboardLogin: (email: string, password: string) =>
+    axios.post<LoginResponse>('/api/auth/wallboard-login', { email, password }),
   me: () => api.get<User>('/auth/me'),
+  meWithToken: (token: string) =>
+    axios.get<User>('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
   register: (data: { name: string; email: string; password: string; role: string }) =>
     api.post<User>('/auth/register', data),
 };
@@ -107,8 +112,36 @@ export const syncApi = {
   }>('/sync/status'),
 };
 
+export const rbacApi = {
+  get: () => api.get<{
+    modules: { id: string; label: string }[];
+    roles: string[];
+    levels: string[];
+    permissions: Record<string, Record<string, string>>;
+    defaults: Record<string, Record<string, string>>;
+  }>('/rbac'),
+  save: (permissions: Record<string, Record<string, string>>) =>
+    api.put('/rbac', { permissions }),
+  me: () => api.get<{ role: string; permissions: Record<string, string> }>('/rbac/me'),
+};
+
+export const settingsApi = {
+  list: () => api.get<Array<{ key: string; enabled: boolean; config: Record<string, unknown> }>>('/settings'),
+  get: (key: string) => api.get(`/settings/${key}`),
+  save: (key: string, body: { config: Record<string, unknown>; enabled: boolean }) =>
+    api.put(`/settings/${key}`, body),
+  test: (key: string, config: Record<string, unknown>) =>
+    api.post<{ ok: boolean; message?: string; error?: string }>(`/settings/${key}/test`, { config }),
+};
+
 export const usersApi = {
   list: () => api.get<User[]>('/users'),
+  create: (data: { name: string; email: string; password: string; role: string }) =>
+    api.post<User>('/users', data),
+  update: (id: string, data: Partial<User> & { is_active?: boolean }) =>
+    api.patch<User>(`/users/${id}`, data),
+  resetPassword: (id: string, password: string) =>
+    api.post(`/users/${id}/reset-password`, { password }),
 };
 
 export const threatsApi = {

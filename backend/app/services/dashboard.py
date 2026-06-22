@@ -12,6 +12,7 @@ from app.core.metrics import (
     ONLINE_AGENTS,
 )
 from app.models.models import Alert, Endpoint, Incident, User
+from app.utils.helpers import classification_to_tier, extract_mitre_from_raw, infer_mitre_from_classification
 from app.schemas.schemas import (
     DashboardSummary,
     HeatmapCell,
@@ -28,7 +29,10 @@ class DashboardService:
             .where(Alert.status.notin_(["CLOSED", "FALSE_POSITIVE"]))
             .group_by(Alert.severity)
         )
-        counts = {row[0]: row[1] for row in severity_counts.all()}
+        counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        for severity, count in severity_counts.all():
+            tier = classification_to_tier(severity or "UNKNOWN")
+            counts[tier] = counts.get(tier, 0) + count
 
         open_incidents = await db.scalar(
             select(func.count(Incident.id)).where(Incident.status.notin_(["CLOSED", "RESOLVED"]))
@@ -39,10 +43,10 @@ class DashboardService:
         new_alerts = await db.scalar(select(func.count(Alert.id)).where(Alert.status == "NEW"))
 
         summary = DashboardSummary(
-            critical=counts.get("CRITICAL", 0),
-            high=counts.get("HIGH", 0),
-            medium=counts.get("MEDIUM", 0),
-            low=counts.get("LOW", 0),
+            critical=counts["CRITICAL"],
+            high=counts["HIGH"],
+            medium=counts["MEDIUM"],
+            low=counts["LOW"],
             open_incidents=open_incidents or 0,
             online_agents=online or 0,
             offline_agents=offline or 0,
@@ -52,12 +56,17 @@ class DashboardService:
 
         for severity in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
             for status in ("NEW", "OPEN", "INVESTIGATING", "ESCALATED"):
-                count = await db.scalar(
-                    select(func.count(Alert.id)).where(
-                        Alert.severity == severity, Alert.status == status
-                    )
+                result = await db.execute(
+                    select(Alert.severity, func.count(Alert.id)).where(
+                        Alert.status == status
+                    ).group_by(Alert.severity)
                 )
-                ALERT_COUNT.labels(severity=severity, status=status).set(count or 0)
+                count = sum(
+                    row[1]
+                    for row in result.all()
+                    if classification_to_tier(row[0] or "UNKNOWN") == severity
+                )
+                ALERT_COUNT.labels(severity=severity, status=status).set(count)
 
         for status in ("OPEN", "INVESTIGATING", "ESCALATED", "CONTAINED", "CLOSED"):
             count = await db.scalar(select(func.count(Incident.id)).where(Incident.status == status))
@@ -71,11 +80,14 @@ class DashboardService:
     async def get_threats(self, db: AsyncSession, limit: int = 20) -> list[ThreatFeedItem]:
         result = await db.execute(
             select(Alert)
-            .where(Alert.severity.in_(["CRITICAL", "HIGH"]))
+            .where(Alert.status.notin_(["CLOSED", "FALSE_POSITIVE"]))
             .order_by(Alert.created_at.desc())
-            .limit(limit)
+            .limit(limit * 3)
         )
-        alerts = result.scalars().all()
+        alerts = [
+            a for a in result.scalars().all()
+            if classification_to_tier(a.severity) in ("CRITICAL", "HIGH")
+        ][:limit]
         return [
             ThreatFeedItem(
                 id=a.id,
@@ -89,13 +101,26 @@ class DashboardService:
 
     async def get_heatmap(self, db: AsyncSession) -> list[HeatmapCell]:
         result = await db.execute(
-            select(Alert.mitre_tactics, Alert.mitre_techniques)
+            select(Alert.mitre_tactics, Alert.mitre_techniques, Alert.severity, Alert.raw_data)
             .where(Alert.status.notin_(["CLOSED", "FALSE_POSITIVE"]))
         )
         cell_counts: dict[tuple[str, str], int] = {}
-        for tactics, techniques in result.all():
-            tactics_list = tactics or []
-            techniques_list = techniques or []
+        for tactics, techniques, severity, raw_data in result.all():
+            tactics_list = list(tactics or [])
+            techniques_list = list(techniques or [])
+
+            if (not tactics_list or not techniques_list) and isinstance(raw_data, dict):
+                extracted_t, extracted_k = extract_mitre_from_raw(raw_data)
+                if extracted_t:
+                    tactics_list = extracted_t
+                if extracted_k:
+                    techniques_list = extracted_k
+
+            if not tactics_list or not techniques_list:
+                ft, fk = infer_mitre_from_classification(severity or "UNKNOWN")
+                tactics_list = tactics_list or ft
+                techniques_list = techniques_list or fk
+
             for tactic in tactics_list:
                 for technique in techniques_list:
                     key = (tactic, technique)
@@ -124,9 +149,9 @@ class DashboardService:
             hour_str = hour.strftime("%Y-%m-%d %H:00") if hour else "unknown"
             if hour_str not in hour_data:
                 hour_data[hour_str] = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-            key = severity.lower() if severity else "low"
+            key = classification_to_tier(severity or "UNKNOWN").lower()
             if key in hour_data[hour_str]:
-                hour_data[hour_str][key] = count
+                hour_data[hour_str][key] += count
 
         return [TimelinePoint(hour=h, **counts) for h, counts in sorted(hour_data.items())]
 

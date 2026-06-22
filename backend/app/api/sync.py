@@ -35,7 +35,7 @@ def _run_sync_all(full: bool) -> dict:
 
     session = SyncSession()
     try:
-        service = SyncService()
+        service = SyncService(session)
         counts = service.sync_all(session, full=full)
         session.commit()
         return counts

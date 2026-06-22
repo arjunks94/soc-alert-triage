@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    WALLBOARD_ACCESS_TOKEN_EXPIRE_DAYS: int = 30
+    WALLBOARD_REFRESH_TOKEN_EXPIRE_DAYS: int = 90
 
     S1_BASE_URL: str = ""
     S1_API_TOKEN: str = ""

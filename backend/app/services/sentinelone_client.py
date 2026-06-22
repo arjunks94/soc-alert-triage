@@ -20,10 +20,11 @@ class SentinelOneAPIError(Exception):
 class SentinelOneClient:
     """Client for SentinelOne Cloud Management Console API v2.1."""
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict | None = None) -> None:
         settings = get_settings()
-        self.base_url = settings.S1_BASE_URL.rstrip("/")
-        self.api_token = settings.S1_API_TOKEN
+        cfg = config or {}
+        self.base_url = (cfg.get("base_url") or settings.S1_BASE_URL).rstrip("/")
+        self.api_token = cfg.get("api_token") or settings.S1_API_TOKEN
         self._rate_limit_delay = 0.1
         self._last_request_time = 0.0
         self._page_size = 100

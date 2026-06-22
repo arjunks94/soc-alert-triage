@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,6 +74,8 @@ class SecurityEvent(Base):
     agent_id: Mapped[str | None] = mapped_column(String(255), index=True, nullable=True)
     user_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     site_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    dest_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
     severity: Mapped[str] = mapped_column(String(50), default="INFO", index=True)
     event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     raw_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
@@ -136,6 +138,20 @@ class AuditLog(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
     user = relationship("User")
+
+
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
 
 
 class EnrichmentCache(Base):

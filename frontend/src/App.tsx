@@ -1,7 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { WallboardSessionKeepalive } from './components/WallboardSessionKeepalive';
 import { LoginPage } from './pages/LoginPage';
+import { WallboardLoginPage } from './pages/WallboardLoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { IncidentsPage } from './pages/IncidentsPage';
@@ -12,22 +14,38 @@ import { SettingsPage } from './pages/SettingsPage';
 import { WallboardPage } from './pages/WallboardPage';
 import { EventsPage } from './pages/EventsPage';
 import { useAuthStore } from './stores/authStore';
+import { useWallboardAuthStore } from './stores/wallboardAuthStore';
+import { isWallboardHost } from './utils/wallboard';
 
-function WallboardRoute() {
+function WallboardApp() {
+  const isAuthenticated = useWallboardAuthStore((s) => s.isAuthenticated());
+
   return (
-    <ProtectedRoute>
-      <WallboardPage />
-    </ProtectedRoute>
+    <>
+      <WallboardSessionKeepalive />
+      <Routes>
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <WallboardLoginPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <WallboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
 
-export default function App() {
+function MainApp() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
 
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
-      <Route path="/wallboard" element={<WallboardRoute />} />
+      <Route path="/wallboard" element={<ProtectedRoute><WallboardPage /></ProtectedRoute>} />
       <Route
         element={
           <ProtectedRoute>
@@ -47,4 +65,8 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
+}
+
+export default function App() {
+  return isWallboardHost() ? <WallboardApp /> : <MainApp />;
 }

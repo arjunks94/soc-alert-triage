@@ -22,12 +22,13 @@ class EnrichmentProvider:
 class VirusTotalProvider(EnrichmentProvider):
     name = "virustotal"
 
-    async def enrich(self, ioc_type: str, ioc_value: str) -> dict[str, Any]:
+    async def enrich(self, ioc_type: str, ioc_value: str, api_key: str | None = None) -> dict[str, Any]:
         settings = get_settings()
-        if not settings.VIRUSTOTAL_API_KEY:
+        key = api_key or settings.VIRUSTOTAL_API_KEY
+        if not key:
             return {"error": "VirusTotal API key not configured"}
 
-        headers = {"x-apikey": settings.VIRUSTOTAL_API_KEY}
+        headers = {"x-apikey": key}
         endpoints = {
             "ip": f"https://www.virustotal.com/api/v3/ip_addresses/{ioc_value}",
             "hash": f"https://www.virustotal.com/api/v3/files/{ioc_value}",
@@ -171,9 +172,15 @@ class EnrichmentService:
         if cached:
             return cached, True
 
+        from app.services.settings_service import SettingsService
+        cfg = await SettingsService().get_config(db, "enrichment")
+
         results: dict[str, Any] = {}
         for provider in self.providers:
-            result = await provider.enrich(ioc_type, ioc_value)
+            if provider.name == "virustotal":
+                result = await provider.enrich(ioc_type, ioc_value, cfg.get("virustotal_api_key"))
+            else:
+                result = await provider.enrich(ioc_type, ioc_value)
             results[provider.name] = result
             await self._cache_result(db, ioc_type, ioc_value, provider.name, result)
 

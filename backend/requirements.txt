@@ -27,3 +27,4 @@ pytest-cov==6.0.0
 httpx==0.28.1
 faker==33.1.0
 aiosqlite==0.20.0
+aiosmtplib==3.0.2

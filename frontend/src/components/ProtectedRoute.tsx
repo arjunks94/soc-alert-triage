@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
+import { getAuthStore } from '../stores/getAuthStore';
+import { isWallboardHost } from '../utils/wallboard';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,14 +15,15 @@ const ROLE_LEVEL: Record<string, number> = {
 };
 
 export function ProtectedRoute({ children, minRole = 'VIEWER' }: ProtectedRouteProps) {
-  const { isAuthenticated, user } = useAuthStore();
+  const store = getAuthStore();
+  const { isAuthenticated, user } = store();
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
   if (user && (ROLE_LEVEL[user.role] ?? -1) < (ROLE_LEVEL[minRole] ?? 0)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={isWallboardHost() ? '/login' : '/'} replace />;
   }
 
   return <>{children}</>;
